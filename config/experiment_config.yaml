@@ -1,0 +1,82 @@
+# Translation Vector Distance Experiment Configuration
+
+# Agent configurations
+agents:
+  cursor:
+    command: "cursor-agent"
+    args: ["-p"]
+    timeout: 30
+    retry_attempts: 3
+    retry_delay: 2
+  
+  gemini:
+    command: "gemini"
+    args: ["--chat"]
+    timeout: 30
+    retry_attempts: 3
+    retry_delay: 2
+  
+  claude:
+    command: "claude"
+    args: []
+    timeout: 30
+    retry_attempts: 3
+    retry_delay: 2
+  
+  ollama:
+    command: "ollama"
+    args: ["run", "llama2"]
+    timeout: 30
+    retry_attempts: 3
+    retry_delay: 2
+
+# Experiment parameters
+experiments:
+  error_rates: [0, 10, 25, 35, 50]
+  num_sentences: 15
+  min_sentence_length: 15
+  runs_per_config: 1
+
+# Error injection settings
+error_injection:
+  typo_types:
+    - swap         # Adjacent character swap
+    - deletion     # Character deletion
+    - insertion    # Character insertion
+    - substitution # Character substitution
+  maintain_punctuation: true
+  maintain_capitalization: true
+
+# Embedding configuration
+embeddings:
+  model: "all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+# Distance metrics
+distance_metrics:
+  primary: "cosine"
+  secondary: ["euclidean", "manhattan"]
+
+# Database settings
+database:
+  path: "data/experiments.db"
+  enable_wal: true
+
+# Results and visualization
+results:
+  directory: "results"
+  figure_dpi: 300
+  figure_format: "png"
+
+# Dashboard settings
+dashboard:
+  host: "127.0.0.1"
+  port: 8050
+  debug: false
+
+# Performance targets
+performance:
+  max_translation_time: 30
+  target_success_rate: 0.95
+
