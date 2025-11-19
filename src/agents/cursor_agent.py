@@ -12,7 +12,15 @@ class CursorAgent(BaseAgent):
     def _setup(self) -> None:
         """Setup cursor-agent configuration."""
         self.command = self.config.get('command', 'cursor-agent')
-        self.args = self.config.get('args', ['-p'])
+        self.model = self.config.get('model', None)
+        base_args = self.config.get('args', ['-p'])
+        
+        # Add model flag if model is specified
+        if self.model:
+            self.args = ['--model', self.model] + base_args
+        else:
+            self.args = base_args
+            
         self.timeout = self.config.get('timeout', 30)
         self.retry_attempts = self.config.get('retry_attempts', 3)
         self.retry_delay = self.config.get('retry_delay', 2)
@@ -110,6 +118,7 @@ class CursorAgent(BaseAgent):
                     metadata={
                         'attempt': attempt + 1,
                         'command': self.command,
+                        'model': self.model,
                         'prompt_length': len(prompt)
                     },
                     timestamp=datetime.now()

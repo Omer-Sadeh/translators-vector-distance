@@ -367,7 +367,7 @@ class TranslationDashboard:
         Args:
             debug: Enable debug mode
         """
-        self.app.run_server(host=self.host, port=self.port, debug=debug)
+        self.app.run(host=self.host, port=self.port, debug=debug)
 
 
 def create_dashboard(config_path: Optional[str] = None) -> TranslationDashboard:

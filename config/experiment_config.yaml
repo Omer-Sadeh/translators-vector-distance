@@ -4,6 +4,7 @@
 agents:
   cursor:
     command: "cursor-agent"
+    model: "composer-1"
     args: ["-p"]
     timeout: 30
     retry_attempts: 3

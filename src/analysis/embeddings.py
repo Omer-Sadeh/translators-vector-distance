@@ -1,6 +1,9 @@
+import os
 import numpy as np
 from typing import List, Union
 from sentence_transformers import SentenceTransformer
+
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
 
 class EmbeddingEngine:
