@@ -16,7 +16,7 @@ A production-ready research system for measuring semantic drift through multi-st
 - ✅ **Statistical Analysis**: Correlation, regression, hypothesis testing
 - ✅ **Interactive Dashboard**: Real-time Plotly Dash visualization
 - ✅ **Publication-Quality Graphs**: 300 DPI static visualizations
-- ✅ **Comprehensive Testing**: 85%+ code coverage
+- ✅ **Comprehensive Testing**: 90% code coverage (191 tests)
 - ✅ **Research Notebook**: Jupyter analysis with mathematical formulations
 
 ---
@@ -521,7 +521,7 @@ python -c "from src.visualization.dashboard import create_dashboard; \
 Contributions are welcome! Please follow these guidelines:
 
 1. **Code Style**: Follow PEP 8, use type hints
-2. **Testing**: Add tests for new features (maintain 85%+ coverage)
+2. **Testing**: Add tests for new features (maintain 90%+ coverage)
 3. **Documentation**: Update relevant docs
 4. **Commits**: Use clear, descriptive commit messages
 
@@ -558,7 +558,7 @@ pytest --cov=src --cov-report=term-missing
 - [x] Static visualization (300 DPI)
 - [x] Interactive Dash dashboard
 - [x] Jupyter analysis notebook
-- [x] Comprehensive test suite (85%+ coverage)
+- [x] Comprehensive test suite (90% coverage, 191 tests)
 - [x] Complete documentation
 
 ### Future Enhancements 🔮

@@ -1,6 +1,11 @@
 import random
 import string
-from typing import List, Tuple
+from typing import Tuple
+
+from src.translation.error_strategies import (
+    get_error_types,
+    KEYBOARD_NEIGHBORS
+)
 
 
 class ErrorInjector:
@@ -19,15 +24,7 @@ class ErrorInjector:
             seed: Random seed for reproducibility (optional)
         """
         self.random = random.Random(seed)
-        
-        self.keyboard_neighbors = {
-            'a': 'qwsz', 'b': 'vghn', 'c': 'xdfv', 'd': 'sfcxe', 'e': 'wrds',
-            'f': 'dgcrv', 'g': 'fhvbt', 'h': 'gjbny', 'i': 'uojk', 'j': 'hkinu',
-            'k': 'jlmo', 'l': 'kop', 'm': 'njk', 'n': 'bhjm', 'o': 'ipkl',
-            'p': 'ol', 'q': 'wa', 'r': 'etfd', 's': 'awedxz', 't': 'ryfg',
-            'u': 'yihj', 'v': 'cfgb', 'w': 'qeas', 'x': 'zsdc', 'y': 'tugh',
-            'z': 'asx'
-        }
+        self.keyboard_neighbors = KEYBOARD_NEIGHBORS
     
     def inject_errors(
         self,
@@ -106,13 +103,7 @@ class ErrorInjector:
         
         was_capitalized = core_word[0].isupper() if maintain_capitalization else False
         
-        error_types = [
-            self._character_swap,
-            self._character_deletion,
-            self._character_insertion,
-            self._character_substitution
-        ]
-        
+        error_types = get_error_types(self.random)
         error_func = self.random.choice(error_types)
         corrupted = error_func(core_word.lower())
         
@@ -148,85 +139,6 @@ class ErrorInjector:
         
         return leading, core, trailing
     
-    def _character_swap(self, word: str) -> str:
-        """
-        Swap two adjacent characters.
-        
-        Args:
-            word: Input word
-            
-        Returns:
-            Word with swapped characters
-        """
-        if len(word) < 2:
-            return word
-        
-        pos = self.random.randint(0, len(word) - 2)
-        word_list = list(word)
-        word_list[pos], word_list[pos + 1] = word_list[pos + 1], word_list[pos]
-        
-        return ''.join(word_list)
-    
-    def _character_deletion(self, word: str) -> str:
-        """
-        Delete a random character.
-        
-        Args:
-            word: Input word
-            
-        Returns:
-            Word with deleted character
-        """
-        if len(word) < 2:
-            return word
-        
-        pos = self.random.randint(0, len(word) - 1)
-        return word[:pos] + word[pos + 1:]
-    
-    def _character_insertion(self, word: str) -> str:
-        """
-        Insert a random character.
-        
-        Args:
-            word: Input word
-            
-        Returns:
-            Word with inserted character
-        """
-        pos = self.random.randint(0, len(word))
-        
-        char_at_pos = word[pos - 1].lower() if pos > 0 else word[pos].lower() if pos < len(word) else 'e'
-        
-        if char_at_pos in self.keyboard_neighbors:
-            char = self.random.choice(self.keyboard_neighbors[char_at_pos])
-        else:
-            char = self.random.choice(string.ascii_lowercase)
-        
-        return word[:pos] + char + word[pos:]
-    
-    def _character_substitution(self, word: str) -> str:
-        """
-        Substitute a character with keyboard neighbor.
-        
-        Args:
-            word: Input word
-            
-        Returns:
-            Word with substituted character
-        """
-        if len(word) < 1:
-            return word
-        
-        pos = self.random.randint(0, len(word) - 1)
-        original_char = word[pos].lower()
-        
-        if original_char in self.keyboard_neighbors:
-            new_char = self.random.choice(self.keyboard_neighbors[original_char])
-        else:
-            new_char = self.random.choice(string.ascii_lowercase)
-        
-        return word[:pos] + new_char + word[pos + 1:]
-    
     def calculate_actual_error_rate(self, original: str, corrupted: str) -> float:
         """
         Calculate actual error rate between two texts.
@@ -254,4 +166,8 @@ class ErrorInjector:
         )
         
         return differences / len(original_words)
-
+    
+    _character_swap = lambda self, word: get_error_types(self.random)[0](word)
+    _character_deletion = lambda self, word: get_error_types(self.random)[1](word)
+    _character_insertion = lambda self, word: get_error_types(self.random)[2](word)
+    _character_substitution = lambda self, word: get_error_types(self.random)[3](word)

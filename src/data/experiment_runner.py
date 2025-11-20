@@ -2,14 +2,13 @@ from typing import List, Dict, Optional
 from pathlib import Path
 import logging
 
-from src.agents.base import BaseAgent
 from src.agents.factory import AgentFactory
 from src.translation.chain import TranslationChain
 from src.translation.error_injector import ErrorInjector
 from src.analysis.embeddings import EmbeddingEngine
-from src.analysis.distance import DistanceMetrics
 from src.data.generator import SentenceGenerator
 from src.data.storage import ExperimentStorage
+from src.data.experiment_executor import ExperimentExecutor
 from src.config import get_settings
 
 
@@ -58,6 +57,12 @@ class ExperimentRunner:
         db_path = self.settings.get_database_path()
         self.storage = ExperimentStorage(db_path)
         
+        self.executor = ExperimentExecutor(
+            self.translation_chain,
+            self.embedding_engine,
+            self.storage
+        )
+        
         logger.info(f"Initialized ExperimentRunner with agent: {agent_type}")
     
     def run_single_experiment(
@@ -75,44 +80,7 @@ class ExperimentRunner:
         Returns:
             Experiment ID if successful, None otherwise
         """
-        try:
-            logger.info(f"Running experiment: error_rate={error_rate}")
-            
-            chain_result = self.translation_chain.execute_chain(sentence, error_rate)
-            
-            if not chain_result.success:
-                logger.warning(f"Translation chain failed: {chain_result.error_message}")
-                return None
-            
-            original_embedding = self.embedding_engine.encode(sentence)
-            final_embedding = self.embedding_engine.encode(chain_result.translation_en)
-            
-            embeddings = {
-                'original': original_embedding,
-                'final': final_embedding
-            }
-            
-            distances = DistanceMetrics.all_metrics(original_embedding, final_embedding)
-            
-            sentence_id = self.storage.get_or_create_sentence(sentence)
-            
-            experiment_id = self.storage.store_experiment(
-                sentence_id,
-                chain_result,
-                embeddings,
-                distances
-            )
-            
-            logger.info(
-                f"Experiment {experiment_id} completed: "
-                f"cosine_distance={distances['cosine']:.4f}"
-            )
-            
-            return experiment_id
-            
-        except Exception as e:
-            logger.error(f"Experiment failed: {str(e)}", exc_info=True)
-            return None
+        return self.executor.execute_single(sentence, error_rate)
     
     def run_full_experiment_suite(
         self,

@@ -83,6 +83,181 @@ class TestErrorInjector:
         # Test substitution
         result = injector._character_substitution("hello")
         assert len(result) == len("hello")
+    
+    def test_inject_errors_100_percent(self):
+        """Test error injection with 100% rate."""
+        injector = ErrorInjector(seed=42)
+        text = "The quick brown fox jumps"
+        result = injector.inject_errors(text, 1.0)
+        
+        # All words should be corrupted
+        assert result != text
+        assert len(result.split()) == len(text.split())
+    
+    def test_split_punctuation_leading(self):
+        """Test splitting word with leading punctuation."""
+        injector = ErrorInjector()
+        leading, core, trailing = injector._split_punctuation("'hello")
+        
+        assert leading == "'"
+        assert core == "hello"
+        assert trailing == ""
+    
+    def test_split_punctuation_trailing(self):
+        """Test splitting word with trailing punctuation."""
+        injector = ErrorInjector()
+        leading, core, trailing = injector._split_punctuation("hello!")
+        
+        assert leading == ""
+        assert core == "hello"
+        assert trailing == "!"
+    
+    def test_split_punctuation_both(self):
+        """Test splitting word with both leading and trailing."""
+        injector = ErrorInjector()
+        leading, core, trailing = injector._split_punctuation("'hello,'")
+        
+        assert leading == "'"
+        assert core == "hello"
+        assert trailing == ",'"
+    
+    def test_split_punctuation_none(self):
+        """Test splitting word with no punctuation."""
+        injector = ErrorInjector()
+        leading, core, trailing = injector._split_punctuation("hello")
+        
+        assert leading == ""
+        assert core == "hello"
+        assert trailing == ""
+    
+    def test_corrupt_word_short(self):
+        """Test corrupting very short word."""
+        injector = ErrorInjector(seed=42)
+        result = injector._corrupt_word("a", True, True)
+        
+        # Single character words should not be corrupted
+        assert result == "a"
+    
+    def test_corrupt_word_with_capitalization(self):
+        """Test corruption preserves capitalization."""
+        injector = ErrorInjector(seed=42)
+        result = injector._corrupt_word("Hello", False, True)
+        
+        # Should be different but still capitalized
+        if result != "Hello":
+            assert result[0].isupper()
+    
+    def test_character_swap_short_word(self):
+        """Test swap on 2-character word."""
+        injector = ErrorInjector(seed=42)
+        result = injector._character_swap("ab")
+        
+        assert len(result) == 2
+        assert result == "ba"
+    
+    def test_character_deletion_minimum(self):
+        """Test deletion on 2-character word."""
+        injector = ErrorInjector(seed=42)
+        result = injector._character_deletion("ab")
+        
+        assert len(result) == 1
+        assert result in ["a", "b"]
+    
+    def test_character_insertion_beginning(self):
+        """Test character insertion at beginning."""
+        injector = ErrorInjector(seed=0)
+        result = injector._character_insertion("test")
+        
+        assert len(result) == 5
+    
+    def test_character_substitution_keyboard_neighbors(self):
+        """Test substitution uses keyboard neighbors."""
+        injector = ErrorInjector(seed=42)
+        result = injector._character_substitution("hello")
+        
+        assert len(result) == 5
+        assert result != "hello"
+    
+    def test_character_substitution_non_alpha(self):
+        """Test substitution on non-alphabetic character."""
+        injector = ErrorInjector(seed=42)
+        result = injector._character_substitution("123")
+        
+        # Non-alpha chars should be replaced with random letter
+        assert len(result) == 3
+    
+    def test_calculate_error_rate_all_different(self):
+        """Test error rate with all words different."""
+        injector = ErrorInjector()
+        original = "the quick brown"
+        corrupted = "abc def ghi"
+        
+        rate = injector.calculate_actual_error_rate(original, corrupted)
+        assert rate == 1.0
+    
+    def test_calculate_error_rate_half_different(self):
+        """Test error rate with half different."""
+        injector = ErrorInjector()
+        original = "the quick brown fox"
+        corrupted = "the quick abc def"
+        
+        rate = injector.calculate_actual_error_rate(original, corrupted)
+        assert rate == 0.5
+    
+    def test_calculate_error_rate_empty(self):
+        """Test error rate with empty strings."""
+        injector = ErrorInjector()
+        rate = injector.calculate_actual_error_rate("", "")
+        
+        assert rate == 0.0
+    
+    def test_calculate_error_rate_different_lengths(self):
+        """Test error rate with different length texts."""
+        injector = ErrorInjector()
+        original = "the quick brown"
+        corrupted = "the quick"
+        
+        rate = injector.calculate_actual_error_rate(original, corrupted)
+        assert 0.0 <= rate <= 1.0
+    
+    def test_inject_errors_no_capitalization_preservation(self):
+        """Test error injection without capitalization preservation."""
+        injector = ErrorInjector(seed=42)
+        text = "Hello World"
+        result = injector.inject_errors(text, 0.5, maintain_capitalization=False)
+        
+        assert len(result.split()) == 2
+    
+    def test_inject_errors_reproducible(self):
+        """Test error injection is reproducible with same seed."""
+        text = "The quick brown fox jumps"
+        
+        injector1 = ErrorInjector(seed=42)
+        result1 = injector1.inject_errors(text, 0.5)
+        
+        injector2 = ErrorInjector(seed=42)
+        result2 = injector2.inject_errors(text, 0.5)
+        
+        assert result1 == result2
+    
+    def test_inject_errors_single_word(self):
+        """Test error injection on single word."""
+        injector = ErrorInjector(seed=42)
+        text = "hello"
+        result = injector.inject_errors(text, 1.0)
+        
+        # Single word with 100% rate should be corrupted, but result may vary
+        # Just check it's still a single word
+        assert len(result.split()) == 1
+        # Note: corruption may or may not change the word depending on random seed
+    
+    def test_keyboard_neighbors_coverage(self):
+        """Test keyboard neighbors mapping has all lowercase letters."""
+        injector = ErrorInjector()
+        
+        for letter in 'abcdefghijklmnopqrstuvwxyz':
+            assert letter in injector.keyboard_neighbors
+            assert len(injector.keyboard_neighbors[letter]) > 0
 
 
 class TestTranslationChain:

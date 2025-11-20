@@ -1,11 +1,11 @@
 import sqlite3
 import numpy as np
-import json
 from pathlib import Path
 from typing import List, Dict, Optional, Any
-from datetime import datetime
 
 from src.translation.chain import ChainResult
+from src.data.storage_queries import StorageQueries
+from src.data.storage_mutations import StorageMutations
 
 
 class ExperimentStorage:
@@ -26,6 +26,9 @@ class ExperimentStorage:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_database()
+        
+        self.queries = StorageQueries(self.db_path)
+        self.mutations = StorageMutations(self.db_path)
     
     def _init_database(self) -> None:
         """Initialize database schema."""
@@ -73,54 +76,20 @@ class ExperimentStorage:
                     cosine_distance REAL NOT NULL,
                     euclidean_distance REAL NOT NULL,
                     manhattan_distance REAL NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (experiment_id) REFERENCES experiments(id)
                 )
             """)
             
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_experiments_agent ON experiments(agent_type)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_experiments_error_rate ON experiments(error_rate_target)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_experiments_sentence ON experiments(sentence_id)")
-            
             conn.commit()
     
     def store_sentence(self, text: str) -> int:
-        """
-        Store a sentence and return its ID.
-        
-        Args:
-            text: Sentence text
-            
-        Returns:
-            Sentence ID
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO sentences (text, word_count) VALUES (?, ?)",
-                (text, len(text.split()))
-            )
-            conn.commit()
-            return cursor.lastrowid
+        """Store a sentence and return its ID."""
+        return self.mutations.store_sentence(text)
     
     def get_or_create_sentence(self, text: str) -> int:
-        """
-        Get existing sentence ID or create new one.
-        
-        Args:
-            text: Sentence text
-            
-        Returns:
-            Sentence ID
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id FROM sentences WHERE text = ?", (text,))
-            result = cursor.fetchone()
-            
-            if result:
-                return result[0]
-            else:
-                return self.store_sentence(text)
+        """Get existing sentence ID or create new one."""
+        return self.mutations.get_or_create_sentence(text)
     
     def store_experiment(
         self,
@@ -129,199 +98,48 @@ class ExperimentStorage:
         embeddings: Dict[str, np.ndarray],
         distances: Dict[str, float]
     ) -> int:
-        """
-        Store complete experiment results.
-        
-        Args:
-            sentence_id: ID of original sentence
-            chain_result: Translation chain results
-            embeddings: Dictionary with 'original' and 'final' embeddings
-            distances: Dictionary with distance metrics
-            
-        Returns:
-            Experiment ID
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            metadata_json = json.dumps(chain_result.metadata)
-            
-            cursor.execute("""
-                INSERT INTO experiments (
-                    sentence_id, agent_type, error_rate_target, error_rate_actual,
-                    corrupted_text, translation_fr, translation_he, translation_en,
-                    duration_seconds, duration_en_fr, duration_fr_he, duration_he_en,
-                    success, error_message, metadata
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                sentence_id,
-                chain_result.agent_type,
-                chain_result.error_rate_target,
-                chain_result.error_rate_actual,
-                chain_result.corrupted_text,
-                chain_result.translation_fr,
-                chain_result.translation_he,
-                chain_result.translation_en,
-                chain_result.total_duration_seconds,
-                chain_result.individual_durations.get('en_to_fr', 0.0),
-                chain_result.individual_durations.get('fr_to_he', 0.0),
-                chain_result.individual_durations.get('he_to_en', 0.0),
-                chain_result.success,
-                chain_result.error_message,
-                metadata_json
-            ))
-            
-            experiment_id = cursor.lastrowid
-            
-            original_emb_blob = embeddings['original'].tobytes()
-            final_emb_blob = embeddings['final'].tobytes()
-            
-            cursor.execute("""
-                INSERT INTO embeddings (
-                    experiment_id, original_embedding, final_embedding,
-                    cosine_distance, euclidean_distance, manhattan_distance
-                ) VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                experiment_id,
-                original_emb_blob,
-                final_emb_blob,
-                distances['cosine'],
-                distances['euclidean'],
-                distances['manhattan']
-            ))
-            
-            conn.commit()
-            return experiment_id
+        """Store complete experiment with results."""
+        return self.mutations.store_experiment(
+            sentence_id, chain_result, embeddings, distances
+        )
     
     def get_all_results(self) -> List[Dict[str, Any]]:
-        """
-        Get all experiment results.
-        
-        Returns:
-            List of experiment dictionaries
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            cursor.execute("""
-                SELECT 
-                    e.*,
-                    s.text as original_text,
-                    emb.cosine_distance,
-                    emb.euclidean_distance,
-                    emb.manhattan_distance
-                FROM experiments e
-                JOIN sentences s ON e.sentence_id = s.id
-                LEFT JOIN embeddings emb ON e.id = emb.experiment_id
-                ORDER BY e.created_at DESC
-            """)
-            
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+        """Get all experiment results."""
+        return self.queries.get_all_results()
     
     def get_results_by_agent(self, agent_type: str) -> List[Dict[str, Any]]:
-        """
-        Get results filtered by agent type.
-        
-        Args:
-            agent_type: Agent type to filter
-            
-        Returns:
-            List of experiment dictionaries
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            cursor.execute("""
-                SELECT 
-                    e.*,
-                    s.text as original_text,
-                    emb.cosine_distance,
-                    emb.euclidean_distance,
-                    emb.manhattan_distance
-                FROM experiments e
-                JOIN sentences s ON e.sentence_id = s.id
-                LEFT JOIN embeddings emb ON e.id = emb.experiment_id
-                WHERE e.agent_type = ?
-                ORDER BY e.error_rate_target, e.created_at
-            """, (agent_type,))
-            
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+        """Get results filtered by agent type."""
+        return self.queries.get_results_by_agent(agent_type)
     
     def get_results_by_error_rate(self, error_rate: float) -> List[Dict[str, Any]]:
-        """
-        Get results filtered by error rate.
-        
-        Args:
-            error_rate: Error rate to filter
-            
-        Returns:
-            List of experiment dictionaries
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            cursor.execute("""
-                SELECT 
-                    e.*,
-                    s.text as original_text,
-                    emb.cosine_distance,
-                    emb.euclidean_distance,
-                    emb.manhattan_distance
-                FROM experiments e
-                JOIN sentences s ON e.sentence_id = s.id
-                LEFT JOIN embeddings emb ON e.id = emb.experiment_id
-                WHERE ABS(e.error_rate_target - ?) < 0.01
-                ORDER BY e.agent_type, e.created_at
-            """, (error_rate,))
-            
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+        """Get results filtered by error rate."""
+        return self.queries.get_results_by_error_rate(error_rate)
+    
+    def query_results(
+        self,
+        agent_type: str = None,
+        error_rate: float = None,
+        success_only: bool = False
+    ) -> List[Dict[str, Any]]:
+        """Query results with multiple filters."""
+        return self.queries.query_results(agent_type, error_rate, success_only)
+    
+    def get_experiment_embeddings(self, experiment_id: int) -> Dict[str, np.ndarray]:
+        """Get embedding vectors for an experiment."""
+        return self.queries.get_experiment_embeddings(experiment_id)
+    
+    def count_experiments_by_agent(self) -> Dict[str, int]:
+        """Count experiments grouped by agent type."""
+        return self.queries.count_experiments_by_agent()
     
     def get_statistics(self) -> Dict[str, Any]:
-        """
-        Get database statistics.
-        
-        Returns:
-            Dictionary with statistics
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute("SELECT COUNT(*) FROM sentences")
-            sentence_count = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM experiments")
-            experiment_count = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM experiments WHERE success = 1")
-            successful_count = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT DISTINCT agent_type FROM experiments")
-            agents = [row[0] for row in cursor.fetchall()]
-            
-            cursor.execute("SELECT DISTINCT error_rate_target FROM experiments ORDER BY error_rate_target")
-            error_rates = [row[0] for row in cursor.fetchall()]
-            
-            return {
-                'total_sentences': sentence_count,
-                'total_experiments': experiment_count,
-                'successful_experiments': successful_count,
-                'success_rate': successful_count / experiment_count if experiment_count > 0 else 0,
-                'agents': agents,
-                'error_rates': error_rates
-            }
+        """Get database statistics."""
+        return self.queries.get_statistics()
+    
+    def delete_experiment(self, experiment_id: int) -> None:
+        """Delete an experiment and its embeddings."""
+        self.mutations.delete_experiment(experiment_id)
     
     def clear_all_data(self) -> None:
         """Clear all data from database (use with caution!)."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM embeddings")
-            cursor.execute("DELETE FROM experiments")
-            cursor.execute("DELETE FROM sentences")
-            conn.commit()
-
+        self.mutations.clear_all_data()

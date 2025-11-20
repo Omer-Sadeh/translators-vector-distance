@@ -12,11 +12,75 @@ class OllamaAgent(BaseAgent):
     def _setup(self) -> None:
         """Setup Ollama configuration."""
         self.command = self.config.get('command', 'ollama')
-        self.model = self.config.get('model', 'llama2')
+        self.model = self.config.get('model', 'llama3.2')
         self.args = self.config.get('args', ['run', self.model])
         self.timeout = self.config.get('timeout', 30)
         self.retry_attempts = self.config.get('retry_attempts', 3)
         self.retry_delay = self.config.get('retry_delay', 2)
+        self.auto_start = self.config.get('auto_start', True)
+        self.startup_wait = self.config.get('startup_wait', 5)
+        
+        if not self._check_ollama_running():
+            if self.auto_start:
+                self._start_ollama()
+            else:
+                raise RuntimeError(
+                    "Ollama is not running. Please start it with 'ollama serve' "
+                    "or enable auto_start in config."
+                )
+    
+    def _check_ollama_running(self) -> bool:
+        """
+        Check if Ollama service is running.
+        
+        Returns:
+            True if Ollama is responding, False otherwise
+        """
+        try:
+            result = subprocess.run(
+                [self.command, 'list'],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False
+            )
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return False
+    
+    def _start_ollama(self) -> None:
+        """
+        Start Ollama service in the background.
+        
+        Raises:
+            RuntimeError: If service fails to start
+        """
+        try:
+            subprocess.Popen(
+                [self.command, 'serve'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+            
+            time.sleep(self.startup_wait)
+            
+            max_retries = 3
+            for attempt in range(max_retries):
+                if self._check_ollama_running():
+                    return
+                time.sleep(2)
+            
+            raise RuntimeError(
+                f"Failed to start Ollama after {self.startup_wait + max_retries * 2}s"
+            )
+            
+        except FileNotFoundError:
+            raise RuntimeError(
+                "Ollama not found. Please ensure it's installed and in PATH."
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to start Ollama: {str(e)}")
     
     def get_agent_type(self) -> str:
         """Get agent type identifier."""

@@ -1,0 +1,169 @@
+# Translation Vector Distance Experiment Configuration
+# Copy this file to experiment_config.yaml and customize as needed
+
+# Agent configurations
+# Specify settings for each translation agent type
+agents:
+  # Cursor Agent - Uses cursor-agent CLI
+  cursor:
+    command: "cursor-agent"        # CLI command to invoke
+    model: "composer-1"             # Model name to use
+    args: ["-p"]                    # Additional CLI arguments
+    timeout: 30                     # Timeout in seconds (default: 30)
+    retry_attempts: 3               # Number of retry attempts on failure (default: 3)
+    retry_delay: 2                  # Delay between retries in seconds (default: 2)
+  
+  # Gemini Agent - Uses gemini CLI
+  gemini:
+    command: "gemini"               # CLI command to invoke
+    args: ["--chat"]                # Additional CLI arguments
+    timeout: 30                     # Timeout in seconds
+    retry_attempts: 3               # Number of retry attempts
+    retry_delay: 2                  # Delay between retries
+  
+  # Claude Agent - Uses claude CLI
+  claude:
+    command: "claude"               # CLI command to invoke
+    args: []                        # Additional CLI arguments
+    timeout: 30                     # Timeout in seconds
+    retry_attempts: 3               # Number of retry attempts
+    retry_delay: 2                  # Delay between retries
+  
+  # Ollama Agent - Uses local ollama with llama2
+  ollama:
+    command: "ollama"               # CLI command to invoke
+    args: ["run", "llama2"]         # Model specification
+    timeout: 30                     # Timeout in seconds
+    retry_attempts: 3               # Number of retry attempts
+    retry_delay: 2                  # Delay between retries
+
+# Experiment parameters
+# Define the experimental design and parameter space
+experiments:
+  # Error rates to test as percentages (0-100)
+  # Example: [0, 10, 25, 35, 50] tests 0%, 10%, 25%, 35%, 50% error rates
+  error_rates: [0, 10, 25, 35, 50]
+  
+  # Number of test sentences to use
+  # Set to null or omit to use all available sentences
+  num_sentences: 15
+  
+  # Minimum sentence length in words
+  # Sentences shorter than this will be filtered out
+  min_sentence_length: 15
+  
+  # Number of runs per configuration
+  # Increase for more statistical robustness
+  runs_per_config: 1
+
+# Error injection settings
+# Configure how spelling errors are introduced
+error_injection:
+  # Types of typos to inject (all are used with equal probability)
+  # Available types: swap, deletion, insertion, substitution
+  typo_types:
+    - swap         # Adjacent character swap (e.g., "the" → "teh")
+    - deletion     # Character deletion (e.g., "word" → "wor")
+    - insertion    # Random character insertion (e.g., "word" → "woprd")
+    - substitution # Character substitution (e.g., "word" → "wird")
+  
+  # Preserve punctuation marks when injecting errors
+  maintain_punctuation: true
+  
+  # Preserve capitalization patterns when injecting errors
+  maintain_capitalization: true
+
+# Embedding configuration
+# Settings for sentence embedding model
+embeddings:
+  # Sentence-BERT model to use for embeddings
+  # Options: "all-MiniLM-L6-v2" (fast, 384-dim), "all-mpnet-base-v2" (best quality, 768-dim)
+  model: "all-MiniLM-L6-v2"
+  
+  # Device to run embeddings on: "cpu" or "cuda" (requires CUDA setup)
+  device: "cpu"
+  
+  # Batch size for embedding calculation
+  # Larger values are faster but use more memory
+  batch_size: 32
+
+# Distance metrics
+# Configure which distance metrics to calculate
+distance_metrics:
+  # Primary metric used for analysis and plots
+  primary: "cosine"
+  
+  # Additional metrics to calculate and store
+  # Available: "euclidean", "manhattan"
+  secondary: ["euclidean", "manhattan"]
+
+# Database settings
+# Configuration for SQLite experiment storage
+database:
+  # Path to SQLite database file (relative to project root)
+  path: "data/experiments.db"
+  
+  # Enable Write-Ahead Logging for better concurrency
+  # Recommended: true for multi-threaded access
+  enable_wal: true
+
+# Results and visualization
+# Output settings for experiment results
+results:
+  # Directory for storing result files (relative to project root)
+  directory: "results"
+  
+  # DPI for generated figures (higher = better quality, larger files)
+  # Recommended: 300 for publication, 150 for preview
+  figure_dpi: 300
+  
+  # Figure format: "png", "pdf", "svg"
+  figure_format: "png"
+
+# Dashboard settings
+# Interactive visualization dashboard configuration
+dashboard:
+  # Host address to bind dashboard server
+  # Use "127.0.0.1" for localhost only, "0.0.0.0" for network access
+  host: "127.0.0.1"
+  
+  # Port number for dashboard server
+  port: 8050
+  
+  # Enable debug mode (auto-reload on code changes)
+  # Set to false for production
+  debug: false
+
+# Performance targets
+# Quality thresholds for experiment validation
+performance:
+  # Maximum allowed time per translation in seconds
+  max_translation_time: 30
+  
+  # Target success rate for experiments (0.0 to 1.0)
+  # Experiment suite warns if success rate falls below this threshold
+  target_success_rate: 0.95
+
+# Example configurations for specific use cases:
+#
+# Quick Test (fast iteration):
+# experiments:
+#   error_rates: [0, 25, 50]
+#   num_sentences: 5
+#   runs_per_config: 1
+#
+# Full Experiment (comprehensive):
+# experiments:
+#   error_rates: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
+#   num_sentences: 50
+#   runs_per_config: 3
+#
+# Custom Agent (add your own):
+# agents:
+#   my_agent:
+#     command: "my-translator"
+#     args: ["--mode", "fast"]
+#     timeout: 60
+#     retry_attempts: 5
+#     retry_delay: 3
+
